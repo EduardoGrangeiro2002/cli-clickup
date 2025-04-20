@@ -1,11 +1,5 @@
 package main
 
-// An example demonstrating an application with multiple views.
-//
-// Note that this example was produced before the Bubbles progress component
-// was available (github.com/charmbracelet/bubbles/progress) and thus, we're
-// implementing a progress bar from scratch here.
-
 import (
 	"fmt"
 
@@ -30,7 +24,7 @@ var (
 type AppModel struct {
 	currentView   int
 	choice        views.ChoiceModel
-	taskForm      views.CreateTaskFormModel
+	taskForm      *views.CreateTaskFormModel
 	listTaskTable views.ListTaskTableModel
 	// createMeetingForm views.CeateMeetingFormModel
 	// listMeetingTable  views.ListMeetingTableModel
@@ -41,7 +35,7 @@ func initialModel() AppModel {
 	return AppModel{
 		currentView:   -1,
 		choice:        views.ChoiceModel{},
-		taskForm:      views.InitialCreateTaskFormModel(),
+		taskForm:      views.NewModel(),
 		listTaskTable: views.InitializeTaskTable(),
 		// createMeetingForm: CeateMeetingFormModel{},
 		// listMeetingTable:  ListMeetingTableModel{},
@@ -58,13 +52,24 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		k := msg.String()
 		if k == "esc" || k == "ctrl+c" {
+			if m.currentView != -1 {
+				switch m.currentView {
+				case 0:
+					taskFormModel, cmd := m.taskForm.Update(msg)
+					m.taskForm = taskFormModel.(*views.CreateTaskFormModel)
+					return m, cmd
+				}
+			}
 			m.Quitting = true
 			return m, tea.Quit
 		}
-		// if k == "r" {
-		// 	m.currentView = 1
-		// 	return m, nil
-		// }
+
+		if k == "ctrl+r" {
+			if m.currentView != -1 {
+				m.currentView = -1
+				return m, nil
+			}
+		}
 	}
 
 	switch m.currentView {
@@ -74,7 +79,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, choiceCmd)
 	case 0:
 		taskFormModel, taskFormCmd := m.taskForm.Update(msg)
-		m.taskForm = taskFormModel.(views.CreateTaskFormModel)
+		m.taskForm = taskFormModel.(*views.CreateTaskFormModel)
 		cmds = append(cmds, taskFormCmd)
 	case 1:
 		listTaskTableModel, listTaskTableCmd := m.listTaskTable.Update(msg)

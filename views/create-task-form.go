@@ -2,49 +2,115 @@ package views
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-)
-
-type (
-	errMsg error
-)
-
-const (
-	name = iota
-	description
-	status
-	date
-	owners
-	priority
-	stimatedTime
-)
-
-type item string
-
-const (
-	hotPink  = lipgloss.Color("#FF06B7")
-	darkGray = lipgloss.Color("#767676")
-)
-
-var (
-	inputStyle    = lipgloss.NewStyle().Foreground(hotPink)
-	continueStyle = lipgloss.NewStyle().Foreground(darkGray)
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/huh/spinner"
 )
 
 type CreateTaskFormModel struct {
-	inputs          []textinput.Model
-	focused         int
-	statusOptions   []string
-	showDropdown    bool
-	dropdownFocused bool
-	err             error
+	form          *huh.Form
+	name          string
+	description   string
+	status        string
+	owners        []string
+	priority      string
+	date          string
+	stimatedTime  string
+	confirmedForm bool
+	quitting      bool
+}
+
+func NewModel() *CreateTaskFormModel {
+	m := &CreateTaskFormModel{}
+	m.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Nome").
+				Value(&m.name).
+				Validate(nameValidator),
+			huh.NewText().
+				Title("Descricão").
+				CharLimit(900).
+				Value(&m.description).
+				Validate(descriptionValidator),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Options(huh.NewOptions("Pendente", "Concluido", "Cancelado")...).
+				Title("Status").
+				Value(&m.status),
+			huh.NewMultiSelect[string]().
+				Options(huh.NewOptions("Jefferson", "Robson", "Zolk", "Eduardo", "Luciano")...).
+				Title("Responsáveis").
+				Value(&m.owners),
+			huh.NewInput().
+				Title("Data").
+				Value(&m.date).
+				Validate(dateValidator).
+				CharLimit(36),
+		),
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Options(huh.NewOptions("Urgente", "Alta", "Normal", "Baixa")...).
+				Title("Prioridade").
+				Value(&m.priority),
+
+			huh.NewSelect[string]().
+				Options(huh.NewOptions("1h", "2h", "4h", "6h", "8h", "12", "24")...).
+				Title("Tempo estimado").
+				Value(&m.stimatedTime),
+			huh.NewConfirm().
+				Title("Criar tarefa?").
+				Value(&m.confirmedForm),
+		),
+	)
+
+	m.form.NextField()
+	m.form.PrevField()
+
+	return m
+}
+
+func (m *CreateTaskFormModel) Init() tea.Cmd {
+	return m.form.Init()
+}
+
+func (m *CreateTaskFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		switch msg.String() {
+		case "esc", "ctrl+c":
+			m.quitting = true
+			return m, tea.Quit
+		}
+	}
+	form, cmd := m.form.Update(msg)
+
+	if f, ok := form.(*huh.Form); ok {
+		m.form = f
+	}
+
+	return m, cmd
+}
+
+func (m *CreateTaskFormModel) View() string {
+	if m.quitting {
+		return "Formulário cancelado"
+	}
+
+	if m.form.State == huh.StateCompleted && m.confirmedForm {
+		_ = spinner.New().Title("Enviando a tarefa para o ClickUp").Action(sendData).Run()
+	}
+	return m.form.View()
+}
+
+func sendData() {
+	time.Sleep(2 * time.Second)
 }
 
 func dateValidator(input string) error {
-	if (len(input) == 0 || len(input) > 35) && (len(input) < 10 || len(input) > 16) {
+	if (len(input) == 0 || len(input) > 36) && (len(input) < 10 || len(input) > 16) {
 		return fmt.Errorf("a data da tarefa não pode ser vazia e deve ter o formato DD-MM-YYYY:hh:mm")
 	}
 	return nil
@@ -90,160 +156,4 @@ func estimatedTimeValidator(input string) error {
 		return fmt.Errorf("o tempo estimado da tarefa não pode ser vazio")
 	}
 	return nil
-}
-
-func InitialCreateTaskFormModel() CreateTaskFormModel {
-	var inputs []textinput.Model = make([]textinput.Model, 7)
-
-	inputs[name] = textinput.New()
-	inputs[name].Placeholder = "Digite o nome da tarefa"
-	inputs[name].Focus()
-	inputs[name].CharLimit = 45
-	inputs[name].Width = 55
-	inputs[name].Prompt = ""
-	inputs[name].Validate = nameValidator
-
-	inputs[description] = textinput.New()
-	inputs[description].Placeholder = "Digite a descrição da tarefa"
-	inputs[description].CharLimit = 900
-	inputs[description].Width = 1000
-	inputs[description].Prompt = ""
-	inputs[description].Validate = descriptionValidator
-
-	inputs[status] = textinput.New()
-	inputs[status].Placeholder = "Selecione o status da tarefa"
-	inputs[status].CharLimit = 35
-	inputs[status].Width = 45
-	inputs[status].ShowSuggestions = true
-	inputs[status].SetSuggestions([]string{"Pendente", "Concluída", "Cancelada"})
-	inputs[status].Validate = statusValidator
-
-	inputs[date] = textinput.New()
-	inputs[date].Placeholder = "Digite a data da tarefa no formato DD-MM-YYYY:hh:mm"
-	inputs[date].CharLimit = 35
-	inputs[date].Width = 45
-	inputs[date].Prompt = ""
-	inputs[date].Validate = dateValidator
-
-	inputs[owners] = textinput.New()
-	inputs[owners].Placeholder = "Digite os responsáveis da tarefa no formato Name1,Name2"
-	inputs[owners].CharLimit = 200
-	inputs[owners].Width = 220
-	inputs[owners].Prompt = ""
-	inputs[owners].Validate = ownersValidator
-
-	inputs[priority] = textinput.New()
-	inputs[priority].Placeholder = "Digite a prioridade da tarefa"
-	inputs[priority].CharLimit = 35
-	inputs[priority].Width = 45
-	inputs[priority].Prompt = ""
-	inputs[priority].Validate = priorityValidator
-
-	inputs[stimatedTime] = textinput.New()
-	inputs[stimatedTime].Placeholder = "Digite o tempo estimado da tarefa no formato 3h30m"
-	inputs[stimatedTime].CharLimit = 50
-	inputs[stimatedTime].Width = 60
-	inputs[stimatedTime].Prompt = ""
-	inputs[stimatedTime].Validate = estimatedTimeValidator
-
-	return CreateTaskFormModel{
-		inputs:  inputs,
-		focused: 0,
-		err:     nil,
-		statusOptions: []string{
-			"Pendente",
-			"Concluída",
-			"Cancelada",
-		},
-		showDropdown: false,
-	}
-}
-
-func (m CreateTaskFormModel) Init() tea.Cmd {
-	return textinput.Blink
-}
-
-func (m CreateTaskFormModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd = make([]tea.Cmd, len(m.inputs))
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyEnter:
-			if m.focused == len(m.inputs)-1 {
-				return m, tea.Quit
-			}
-		case tea.KeyCtrlC, tea.KeyEsc:
-			return m, tea.Quit
-
-		case tea.KeyShiftTab, tea.KeyCtrlP:
-			m.prevInput()
-		case tea.KeyTab, tea.KeyCtrlN:
-			m.nextInput()
-		}
-		for i := range m.inputs {
-			m.inputs[i].Blur()
-		}
-		m.inputs[m.focused].Focus()
-	// We handle errors just like any other message
-	case errMsg:
-		m.err = msg
-		return m, nil
-	}
-
-	for i := range m.inputs {
-		m.inputs[i], cmds[i] = m.inputs[i].Update(msg)
-	}
-	return m, tea.Batch(cmds...)
-}
-
-func (m CreateTaskFormModel) View() string {
-	return fmt.Sprintf(
-		`Formulário para criar uma tarefa:
-
- %s
- %s
-
- %s
- %s
- 
- %s  %s
-
- %s  %s
-
- %s  %s
-
- %s  %s
- %s  %s
- %s
-`,
-		inputStyle.Width(20).Render("Nome"),
-		m.inputs[name].View(),
-		inputStyle.Width(15).Render("Descrição"),
-		m.inputs[description].View(),
-		inputStyle.Width(10).Render("Status"),
-		m.inputs[status].View(),
-		inputStyle.Width(10).Render("Data"),
-		m.inputs[date].View(),
-		inputStyle.Width(15).Render("Responsáveis"),
-		m.inputs[owners].View(),
-		inputStyle.Width(15).Render("Prioridade"),
-		m.inputs[priority].View(),
-		inputStyle.Width(15).Render("Tempo estimado"),
-		m.inputs[stimatedTime].View(),
-		continueStyle.Render("Continue ->"),
-	) + "\n"
-}
-
-func (m *CreateTaskFormModel) nextInput() {
-	m.focused = (m.focused + 1) % len(m.inputs)
-}
-
-// prevInput focuses the previous input field
-func (m *CreateTaskFormModel) prevInput() {
-	m.focused--
-	// Wrap around
-	if m.focused < 0 {
-		m.focused = len(m.inputs) - 1
-	}
 }

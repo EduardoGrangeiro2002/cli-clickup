@@ -69,7 +69,7 @@ func updateChoices(msg tea.Msg, m ChoiceModel) (tea.Model, tea.Cmd) {
 func choicesView(m ChoiceModel) string {
 	c := m.Choice
 
-	tpl := "Welcome to CLI task management\n\n"
+	tpl := "Bem vindo a CLI de gerenciamento de projetos\n\n"
 	tpl += "%s\n\n"
 	tpl += subtleStyle.Render("j/k, up/down: select") + dotStyle +
 		subtleStyle.Render("enter: choose") + dotStyle +
