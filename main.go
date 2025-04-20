@@ -51,6 +51,14 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		k := msg.String()
+
+		if k == "ctrl+r" {
+			m.currentView = -1
+			m.choice.Choice = -1
+			m.choice.Chosen = false
+			m.taskForm = views.NewModel()
+		}
+
 		if k == "esc" || k == "ctrl+c" {
 			if m.currentView != -1 {
 				switch m.currentView {
@@ -62,13 +70,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.Quitting = true
 			return m, tea.Quit
-		}
-
-		if k == "ctrl+r" {
-			if m.currentView != -1 {
-				m.currentView = -1
-				return m, nil
-			}
 		}
 	}
 
@@ -98,6 +99,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if m.choice.Chosen {
 		m.currentView = m.choice.Choice
+	}
+
+	if m.currentView == 0 && m.taskForm.SendData {
+		m.currentView = -1
+		m.choice.Choice = -1
+		m.choice.Chosen = false
+		m.taskForm = views.NewModel()
 	}
 
 	return m, tea.Batch(cmds...)

@@ -20,6 +20,7 @@ type CreateTaskFormModel struct {
 	stimatedTime  string
 	confirmedForm bool
 	quitting      bool
+	SendData      bool
 }
 
 func NewModel() *CreateTaskFormModel {
@@ -101,6 +102,8 @@ func (m *CreateTaskFormModel) View() string {
 
 	if m.form.State == huh.StateCompleted && m.confirmedForm {
 		_ = spinner.New().Title("Enviando a tarefa para o ClickUp").Action(sendData).Run()
+		m.SendData = true
+		return "Tarefa enviada com sucesso!\nPressione qualquer tecla para continuar..."
 	}
 	return m.form.View()
 }
